@@ -1,6 +1,6 @@
-module aoc-in-go
+module github.com/jossmoff/aoc-go
 
-go 1.21.3
+go 1.23
 
 require github.com/jpillora/puzzler v1.3.3
 
@@ -12,7 +12,8 @@ require (
 	github.com/jpillora/ansi v1.0.3 // indirect
 	github.com/jpillora/maplock v0.0.0-20160420012925-5c725ac6e22a // indirect
 	github.com/maruel/panicparse/v2 v2.3.1 // indirect
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 )
