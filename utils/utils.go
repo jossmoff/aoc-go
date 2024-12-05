@@ -88,3 +88,12 @@ func Zip[V1, V2 any](x iter.Seq[V1], y iter.Seq[V2]) iter.Seq[Zipped[V1, V2]] {
 		}
 	}
 }
+
+func Tally[T comparable](in []T) map[T]int {
+	ret := make(map[T]int)
+	for _, v := range in {
+		ret[v] += 1
+	}
+
+	return ret
+}
