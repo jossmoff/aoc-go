@@ -97,3 +97,11 @@ func Tally[T comparable](in []T) map[T]int {
 
 	return ret
 }
+
+func Flatten2D[T any](grid [][]T) []T {
+	var result []T
+	for _, row := range grid {
+		result = append(result, row...)
+	}
+	return result
+}
