@@ -2,12 +2,13 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
-	sets "github.com/jossmoff/aoc-go/utils/ds"
+	"github.com/dominikbraun/graph"
 	"github.com/jpillora/puzzler/harness/aoc"
 )
 
@@ -15,80 +16,144 @@ func main() {
 	aoc.Harness(run)
 }
 
-func parseInput(r io.Reader) (map[int]*sets.Set[int], [][]int, error) {
+func parseInput(r io.Reader) (graph.Graph[int, int], [][]int) {
+	g := graph.New(graph.IntHash, graph.Directed())
+	var updateSequences [][]int
 	scanner := bufio.NewScanner(r)
-	dependencies := make(map[int]*sets.Set[int])
-	var runs [][]int
-	isRunSection := false
+	parsingDependencies := true
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
-			isRunSection = true
+			parsingDependencies = false
 			continue
 		}
 
-		if !isRunSection {
+		if parsingDependencies {
+			// Parse dependencies
 			parts := strings.Split(line, "|")
 			if len(parts) != 2 {
-				return nil, nil, fmt.Errorf("invalid dependency format: %s", line)
+				continue
 			}
-			key, err := strconv.Atoi(parts[0])
-			if err != nil {
-				return nil, nil, err
+			left, err1 := strconv.Atoi(parts[0])
+			right, err2 := strconv.Atoi(parts[1])
+			if err1 != nil || err2 != nil {
+				continue
 			}
-			values := strings.Split(parts[1], ",")
-			for _, v := range values {
-				val, err := strconv.Atoi(v)
-				if err != nil {
-					return nil, nil, err
-				}
-				if _, exists := dependencies[key]; !exists {
-					dependencies[key] = sets.NewSet[int]()
-				}
-				sets.Add(dependencies[key], val)
-			}
+			_ = g.AddVertex(left)
+			_ = g.AddVertex(right)
+			_ = g.AddEdge(left, right)
 		} else {
-			values := strings.Split(line, ",")
-			var run []int
-			for _, v := range values {
-				val, err := strconv.Atoi(v)
+			// Parse update sequences
+			parts := strings.Split(line, ",")
+			var sequence []int
+			for _, part := range parts {
+				page, err := strconv.Atoi(part)
 				if err != nil {
-					return nil, nil, err
+					continue
 				}
-				run = append(run, val)
+				sequence = append(sequence, page)
 			}
-			runs = append(runs, run)
+			updateSequences = append(updateSequences, sequence)
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, nil, err
+		panic(err)
 	}
 
-	return dependencies, runs, nil
+	return g, updateSequences
 }
 
-func run(part2 bool, input string) any {
-	// when you're ready to do part 2, remove this "not implemented" block
-	if part2 {
-		return "not implemented"
-	}
-	dependencySetMap, updates, err := parseInput(strings.NewReader(input))
-	if err != nil {
-		return err
-	}
-	println(updates)
-	for _, update := range updates {
-		seenPageDependencies := sets.NewSet[int]()
-		for _, page := range update {
-			pageDependencies := dependencySetMap[page]
-			var seenAllDependencies = true
-			for _, dep := range sets.List(pageDependencies) {
-				seenAllDependencies = seenAllDependencies && sets.Contains(seenPageDependencies, dep)
-			}
-
+func hasNodeTraversal(g graph.Graph[int, int], nodeSequence []int) bool {
+	for i := 0; i < len(nodeSequence)-1; i++ {
+		if _, err := g.Edge(nodeSequence[i], nodeSequence[i+1]); err != nil {
+			return false
 		}
 	}
-	return 42
+	return true
+}
+
+func sortRelativeTo(reference, toSort []int) []int {
+	orderMap := make(map[int]int)
+	for index, value := range reference {
+		orderMap[value] = index
+	}
+
+	sorted := make([]int, len(toSort))
+	copy(sorted, toSort)
+
+	sort.Slice(sorted, func(i, j int) bool {
+		return orderMap[sorted[i]] < orderMap[sorted[j]]
+	})
+
+	return sorted
+}
+
+func getSubgraph(g graph.Graph[int, int], nodes []int) graph.Graph[int, int] {
+	subgraph := graph.New(graph.IntHash, graph.Directed())
+
+	// Add nodes to the subgraph
+	for _, node := range nodes {
+		_ = subgraph.AddVertex(node)
+	}
+
+	adjacencyMap, _ := g.AdjacencyMap()
+
+	// Add edges to the subgraph
+	for _, fromNode := range nodes {
+		if edgesMap, exists := adjacencyMap[fromNode]; exists {
+			for toNode, _ := range edgesMap {
+				if slices.Contains(nodes, toNode) {
+					_ = subgraph.AddEdge(fromNode, toNode)
+				}
+			}
+		}
+	}
+
+	return subgraph
+}
+
+func part1(input string) int {
+	g, updateSequences := parseInput(strings.NewReader(input))
+	var validMidpoints []int
+
+	for _, sequence := range updateSequences {
+		if hasNodeTraversal(g, sequence) {
+			validMidpoints = append(validMidpoints, sequence[len(sequence)/2])
+		}
+	}
+
+	return sum(validMidpoints)
+}
+
+func part2(input string) int {
+	dag, updateSequences := parseInput(strings.NewReader(input))
+	var reorderedMidpoints []int
+
+	for _, sequence := range updateSequences {
+		if !hasNodeTraversal(dag, sequence) {
+			subGraph := getSubgraph(dag, sequence)
+			sortedSequence, _ := graph.TopologicalSort(subGraph)
+			reorderedMidpoints = append(reorderedMidpoints, sortedSequence[len(sortedSequence)/2])
+		}
+	}
+
+	return sum(reorderedMidpoints)
+}
+
+func run(runPart2 bool, input string) any {
+	if runPart2 {
+		return part2(input)
+	}
+	return part1(input)
+
+}
+
+func sum(slice []int) int {
+	total := 0
+	for _, value := range slice {
+		total += value
+	}
+	return total
 }
